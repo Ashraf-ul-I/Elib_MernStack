@@ -1,51 +1,60 @@
-import { NextFunction,Request,Response } from "express"
-import createHttpError from "http-errors"
-import User from './userModels'
-import bcrypt from 'bcrypt'
-import { sign } from "jsonwebtoken"
-import { config } from "../config/config"
+import { NextFunction, Request, Response } from "express";
+import createHttpError from "http-errors";
+import User from './userModels';
+import bcrypt from 'bcrypt';
+import { sign } from "jsonwebtoken";
+import { config } from "../config/config";
+import { UserTypes } from './userTypes';
 
-const createUser=async (
-    req:Request,
+const createUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
 
-    res:Response,
+  const { name, email, password } = req.body;
 
-    next:NextFunction
-):Promise<void>=>{
-        
-    const {name,email,password}=req.body
-    //Validation
+  // Validation
+  if (!name || !email || !password) {
+    const error = createHttpError(400, "All Fields are required");
+    return next(error);
+  }
 
-    if(!name||!email||!password){
-        const error=createHttpError(400,"All Fields are required");
-        return next(error);
+  try {
+    // Check if user already exists
+    const user = await User.findOne({ email: email });
+    if (user) {
+      const error = createHttpError(409, 'User already exists with this email'); // 409 Conflict
+      return next(error);
     }
-    //database Call
+  } catch (error) {
+    return next(createHttpError(500, 'Error while checking user existence'));
+  }
 
-    const user = await User.findOne({
-        email:email, //means if the email is similiar to email then find
-    })
-     //Process
-    if(user){
-        const error=createHttpError(404,'User already exist with this email')
-        return next(error);
-    }
-    ///password not stored as plain
-    const hashedPassword=await bcrypt.hash(password,10)
-   
-    const newUser=await User.create({
-       name,
-       email,
-       password:hashedPassword //in schema we name this as password so if we save like only 
-       //hashpassword it will throw error so we save that as password:hashedPassword
+  let newUser: UserTypes;
+  try {
+    // Password hashing
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Creating new user
+    newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword
     });
+  } catch (error) {
+    return next(createHttpError(500, 'Error while creating user'));
+  }
 
-    //Token Generation
-    const token= sign({sub:newUser._id},config.jwtSecret as string,{expiresIn:'7d'});
-    
-    //Response
-    res.json({accessToken:token});
-    res.json({ message: "User registered" })
-}
+  try {
+    // Token Generation
+    const token = sign({ sub: newUser._id }, config.jwtSecret as string, { expiresIn: '7d' });
 
-export {createUser}
+    // Response
+    res.json({ accessToken: token, message: "User registered" });
+  } catch (error) {
+    return next(createHttpError(500, 'Error while generating token'));
+  }
+};
+
+export { createUser };
