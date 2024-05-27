@@ -4,7 +4,7 @@ import userRouter from "./user/userRouter";
 
 const app:Application=express()
 
-
+app.use(express.json());
 //ROUTES
 //Http methods get post put patch delete
 app.get('/',(req:Request,res:Response,next:NextFunction)=>{
