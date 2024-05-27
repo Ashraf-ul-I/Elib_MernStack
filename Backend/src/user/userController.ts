@@ -1,6 +1,8 @@
 import { NextFunction,Request,Response } from "express"
 import createHttpError from "http-errors"
 import User from './userModels'
+import bcrypt from 'bcrypt'
+
 const createUser=async (
     req:Request,
 
@@ -25,6 +27,8 @@ const createUser=async (
         const error=createHttpError(404,'User already exist with this email')
         return next(error);
     }
+    ///password not stored as plain
+    const hashedPassword=await bcrypt.hash(password,10)
     
     //Process
     //Response
